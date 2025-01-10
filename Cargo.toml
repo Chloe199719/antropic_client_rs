@@ -1,10 +1,11 @@
 [package]
 name = "antropic_client"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Chloe Pratas <chloevision97@gmail.com>"]
 license = "MIT"
 description = "A client for the Antropic API"
+repository = "https://github.com/Chloe199719/antropic_client"
 
 [dependencies]
 reqwest = { version = "0.12.9", features = [
