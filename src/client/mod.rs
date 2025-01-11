@@ -209,6 +209,19 @@ pub struct Source {
     pub data: String,
     pub media_type: MediaType,
 }
+impl Source {
+    /// Create a new source
+    /// content_type: The content type of the source
+    /// data : Image Base65 data
+    /// media_type: The media type of the source
+    pub fn new(data: String, media_type: MediaType) -> Self {
+        Self {
+            content_type: "base64".to_string(),
+            data,
+            media_type,
+        }
+    }
+}
 #[derive(Debug, Serialize, Deserialize)]
 pub enum MediaType {
     #[serde(rename = "image/jpeg")]
