@@ -41,11 +41,10 @@ impl AnthropicClient {
 }
 #[derive(Debug, Serialize, Deserialize)]
 /// Request body for the Anthropic API
-///   model: The model to use for the completion
-///  max_tokens: The maximum number of tokens to generate
-///  messages: The messages to use for the completion
+/// model: The model to use for the completion
+/// max_tokens: The maximum number of tokens to generate
+/// messages: The messages to use for the completion
 /// temperature: The temperature to use for the completion
-///
 pub struct RequestBodyAnthropic {
     pub model: String,
     pub max_tokens: i32,
