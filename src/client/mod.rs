@@ -122,6 +122,20 @@ pub enum Role {
     #[serde(rename = "assistant")]
     Assistant,
 }
+impl Default for Role {
+    fn default() -> Self {
+        Self::User
+    }
+}
+impl Role {
+    pub fn new(role: &str) -> Self {
+        match role {
+            "user" => Self::User,
+            "assistant" => Self::Assistant,
+            _ => Self::User,
+        }
+    }
+}
 #[derive(Debug, Serialize, Deserialize)]
 
 pub struct ResponseBodyAnthropic {
