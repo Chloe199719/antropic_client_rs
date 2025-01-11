@@ -24,20 +24,58 @@ impl AnthropicClient {
             .header("x-api-key", &self.api_key)
             .body(serde_json::to_string(&body).unwrap())
             .send()
-            .await?
-            // .text()
-            .json::<ResponseBodyAnthropic>()
             .await?;
-        Ok(res)
+        match res.status() {
+            reqwest::StatusCode::OK => {}
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Error: {}",
+                    res.text().await.unwrap_or("".to_string())
+                ));
+            }
+        }
+        // .text()
+        let body = res.json::<ResponseBodyAnthropic>().await?;
+        Ok(body)
     }
 }
 #[derive(Debug, Serialize, Deserialize)]
-
+/// Request body for the Anthropic API
+///   model: The model to use for the completion
+///  max_tokens: The maximum number of tokens to generate
+///  messages: The messages to use for the completion
+/// temperature: The temperature to use for the completion
+///
 pub struct RequestBodyAnthropic {
     pub model: String,
     pub max_tokens: i32,
     pub messages: Vec<Messages>,
     pub temperature: Option<f32>,
+}
+impl Default for RequestBodyAnthropic {
+    fn default() -> Self {
+        Self {
+            model: "claude-3-5-sonnet-20241022".to_string(),
+            max_tokens: 1000,
+            messages: vec![],
+            temperature: Some(0.1),
+        }
+    }
+}
+impl RequestBodyAnthropic {
+    pub fn new(
+        model: String,
+        max_tokens: i32,
+        messages: Vec<Messages>,
+        temperature: Option<f32>,
+    ) -> Self {
+        Self {
+            model,
+            max_tokens,
+            messages,
+            temperature,
+        }
+    }
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub enum MessageType {}
@@ -47,11 +85,34 @@ pub enum MessageContent {
     String(String),
     ContentArray(Vec<ContentType>),
 }
-
+/// Messages to be sent to the API
+/// role: The role of the message
+/// content: The content of the message
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Messages {
     pub role: Role,
     pub content: MessageContent,
+}
+impl Messages {
+    pub fn new(role: Role, content: MessageContent) -> Self {
+        Self { role, content }
+    }
+    /// Create a new message prompt
+    /// content: The content of the message
+    pub fn new_user_message_prompt(content: String) -> Self {
+        Self {
+            role: Role::User,
+            content: MessageContent::String(content),
+        }
+    }
+    /// Create a new assistant message prompt
+    /// content: The content of the message
+    pub fn new_assistant_message_prompt(content: String) -> Self {
+        Self {
+            role: Role::Assistant,
+            content: MessageContent::String(content),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
