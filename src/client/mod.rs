@@ -76,13 +76,32 @@ impl RequestBodyAnthropic {
         }
     }
 }
-#[derive(Debug, Serialize, Deserialize)]
-pub enum MessageType {}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum MessageContent {
     String(String),
     ContentArray(Vec<ContentType>),
+}
+impl Default for MessageContent {
+    fn default() -> Self {
+        Self::String("".to_string())
+    }
+}
+impl MessageContent {
+    pub fn new(content: &str) -> Self {
+        Self::String(content.to_string())
+    }
+    /// Create a new content array message
+    /// content: The content of the message
+    /// The content of the message
+    pub fn new_content_array_text(content: Vec<String>) -> Self {
+        let content = content
+            .iter()
+            .map(|text| ContentType::new_text(text.to_string()))
+            .collect();
+        Self::ContentArray(content)
+    }
 }
 /// Messages to be sent to the API
 /// role: The role of the message
@@ -102,6 +121,12 @@ impl Messages {
         Self {
             role: Role::User,
             content: MessageContent::String(content),
+        }
+    }
+    pub fn new_user_message_prompt_content_array(content: Vec<String>) -> Self {
+        Self {
+            role: Role::User,
+            content: MessageContent::new_content_array_text(content),
         }
     }
     /// Create a new assistant message prompt
@@ -203,6 +228,28 @@ pub enum ContentType {
     Text(ContentText),
     #[serde(rename = "image")]
     Image(ContentImage),
+}
+impl Default for ContentType {
+    fn default() -> Self {
+        Self::Text(ContentText {
+            text: "".to_string(),
+            content_type: "".to_string(),
+        })
+    }
+}
+impl ContentType {
+    pub fn new_text(text: String) -> Self {
+        Self::Text(ContentText {
+            text,
+            content_type: "text".to_string(),
+        })
+    }
+    pub fn new_image(source: Source) -> Self {
+        Self::Image(ContentImage {
+            source,
+            content_type: "image".to_string(),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -378,6 +425,27 @@ Example 2:
                 println!("{:?}", e);
                 assert!(false);
             }
+        }
+    }
+    #[test]
+    fn test_crater_content_message_text_array() {
+        let prompts = vec!["test1", "test2", "test3"];
+        let content =
+            MessageContent::new_content_array_text(prompts.iter().map(|x| x.to_string()).collect());
+        if let MessageContent::ContentArray(content) = content {
+            assert_eq!(content.len(), 3);
+            for (i, c) in content.iter().enumerate() {
+                match c {
+                    ContentType::Text(c) => {
+                        assert_eq!(c.text, format!("test{}", i + 1));
+                    }
+                    _ => {
+                        assert!(false);
+                    }
+                }
+            }
+        } else {
+            assert!(false);
         }
     }
 }
