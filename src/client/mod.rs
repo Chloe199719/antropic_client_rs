@@ -1,3 +1,4 @@
+pub mod models;
 use serde::{Deserialize, Serialize};
 
 pub struct AnthropicClient {
