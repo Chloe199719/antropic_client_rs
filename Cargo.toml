@@ -1,6 +1,6 @@
 [package]
 name = "antropic_client_rs"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["Chloe Pratas <chloevision97@gmail.com>"]
 license = "MIT"
