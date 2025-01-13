@@ -1,18 +1,140 @@
 pub mod models;
+use core::fmt;
+
+use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 
+const ANTHROPIC_VERSION: &str = "anthropic-version";
+const X_API_KEY: &str = "x-api-key";
+const ANTHROPIC_API_URL: &str = "https://api.anthropic.com";
+
+pub enum Version {
+    Latest,
+    Initial,
+}
+impl Default for Version {
+    fn default() -> Self {
+        Self::Latest
+    }
+}
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Version::Latest => write!(f, "2023-06-01"),
+            Version::Initial => write!(f, "2023-01-01"),
+        }
+    }
+}
+pub enum ApiVersion {
+    V1,
+}
+impl Default for ApiVersion {
+    fn default() -> Self {
+        Self::V1
+    }
+}
+
+impl fmt::Display for ApiVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::V1 => write!(f, "v1"),
+        }
+    }
+}
+pub struct Config {
+    pub api_key: String,
+    pub api_url: String,
+    pub version: Version,
+    pub api_version: ApiVersion,
+}
 pub struct AnthropicClient {
     api_key: String,
     api_url: String,
+    version: Version,
+    api_version: ApiVersion,
     client: reqwest::Client,
 }
-impl AnthropicClient {
+impl Config {
     pub fn new(api_key: String, api_url: String) -> Self {
         Self {
             api_key,
             api_url,
-            client: reqwest::Client::new(),
+            version: Version::Latest,
+            api_version: ApiVersion::V1,
         }
+    }
+    pub fn set_version(&mut self, version: Version) {
+        self.version = version;
+    }
+    pub fn new_with_version(api_key: String, api_url: String, version: Version) -> Self {
+        Self {
+            api_key,
+            api_url,
+            version,
+            api_version: ApiVersion::V1,
+        }
+    }
+    /// Create a new config with the api key and the api url
+    /// Api key is read from the environment variable ANTHROPIC_API_KEY
+    /// Api url is set to https://api.anthropic.com
+    /// version is set to the latest version
+    /// api_version is set to v1
+    pub fn default() -> Result<Self, anyhow::Error> {
+        let api_key = std::env::var("ANTHROPIC_API_KEY")?;
+        Ok(Self {
+            api_key,
+            api_url: ANTHROPIC_API_URL.to_string(),
+            version: Version::Latest,
+            api_version: ApiVersion::V1,
+        })
+    }
+}
+impl AnthropicClient {
+    pub fn new(config: Config) -> Self {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            ANTHROPIC_VERSION,
+            config.version.to_string().parse().unwrap(),
+        );
+        headers.insert(X_API_KEY, config.api_key.parse().unwrap());
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+
+        Self {
+            api_key: config.api_key,
+            api_url: config.api_url,
+            client,
+            version: config.version,
+            api_version: config.api_version,
+        }
+    }
+    pub fn default() -> Result<Self, anyhow::Error> {
+        let config = Config::default()?;
+        let mut headers = HeaderMap::new();
+        headers.insert(ANTHROPIC_VERSION, config.version.to_string().parse()?);
+        headers.insert(X_API_KEY, config.api_key.parse()?);
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+
+        Ok(Self {
+            api_key: config.api_key,
+            api_url: config.api_url,
+            client,
+            version: config.version,
+            api_version: config.api_version,
+        })
+    }
+    pub fn set_version(&mut self, version: Version) {
+        self.version = version;
+    }
+
+    fn get_url(&self, path: &str) -> String {
+        format!("{}/{}/{}", self.api_url, self.api_version, path)
     }
     pub async fn get_message_completed(
         &self,
@@ -20,9 +142,7 @@ impl AnthropicClient {
     ) -> Result<ResponseBodyAnthropic, anyhow::Error> {
         let res = self
             .client
-            .post(&format!("{}/v1/messages", self.api_url))
-            .header("anthropic-version", "2023-06-01")
-            .header("x-api-key", &self.api_key)
+            .post(self.get_url("messages"))
             .body(serde_json::to_string(&body).unwrap())
             .send()
             .await?;
@@ -35,7 +155,6 @@ impl AnthropicClient {
                 ));
             }
         }
-        // .text()
         let body = res.json::<ResponseBodyAnthropic>().await?;
         Ok(body)
     }
@@ -274,10 +393,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_message_completed() {
         dotenvy::dotenv().ok();
-        let client = AnthropicClient::new(
-            std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY not found"),
-            "https://api.anthropic.com".to_string(),
-        );
+        let client = AnthropicClient::default().unwrap();
         let messages = vec![Messages {
             role: Role::User,
             content: MessageContent::String("What is the capital of France?".to_string()),
@@ -302,10 +418,7 @@ mod tests {
     #[tokio::test]
     async fn test_string_message() {
         dotenvy::dotenv().ok();
-        let client = AnthropicClient::new(
-            std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY not found"),
-            "https://api.anthropic.com".to_string(),
-        );
+        let client = AnthropicClient::default().unwrap();
         let messages = vec![Messages {
             role: Role::User,
             content: MessageContent::String("What is the capital of France?".to_string()),
@@ -331,11 +444,7 @@ mod tests {
     #[tokio::test]
     async fn test_content_array_message() {
         dotenvy::dotenv().ok();
-        let client = AnthropicClient::new(
-            std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY not found"),
-            "https://api.anthropic.com".to_string(),
-        );
-
+        let client = AnthropicClient::default().unwrap();
         let image_bytes = reqwest::get("https://rocketutor-math.s3.eu-central-1.amazonaws.com/ocr/GHuO0CD28Ut8eBMxQwgjD5bNFfCp/solution4_boris.jpg")
             .await
             .unwrap()

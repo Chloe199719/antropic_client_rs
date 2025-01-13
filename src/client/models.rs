@@ -74,9 +74,11 @@ impl AnthropicClient {
             .get(&url)
             .header("anthropic-version", "2023-06-01")
             .header("x-api-key", &self.api_key)
-            .query(&serde_json::to_string(&params)?)
+            .query(&params)
             .send()
             .await?;
+        println!("Test");
+        println!("{:#?}", response.url());
         if response.status() != StatusCode::OK {
             return Err(anyhow::anyhow!(response.text().await?));
         }
@@ -154,21 +156,31 @@ pub mod tests {
     #[tokio::test]
     async fn test_get_models() {
         dotenvy::dotenv().ok();
-        let client = AnthropicClient::new(
-            std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY not found"),
-            "https://api.anthropic.com".to_string(),
-        );
+        let client = AnthropicClient::default().unwrap();
         let models = client.get_models().await.unwrap();
 
         assert!(models.data.len() > 1);
     }
     #[tokio::test]
+
+    async fn test_get_models_with_params() {
+        dotenvy::dotenv().ok();
+        let client = AnthropicClient::default().unwrap();
+        let models = client
+            .get_model_with_params(GetModelsQueryParams {
+                before_id: None,
+                after_id: None,
+                limit: Some(1),
+            })
+            .await
+            .unwrap();
+        println!("{:#?}", models);
+        assert!(models.data.len() == 1);
+    }
+    #[tokio::test]
     async fn test_get_models_by_id() {
         dotenvy::dotenv().ok();
-        let client = AnthropicClient::new(
-            std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY not found"),
-            "https://api.anthropic.com".to_string(),
-        );
+        let client = AnthropicClient::default().unwrap();
         let models = client
             .get_model_by_id("claude-3-5-sonnet-20241022".to_string())
             .await
